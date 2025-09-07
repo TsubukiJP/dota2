@@ -60,6 +60,14 @@ jobs:
             --japanese "$JA" \
             --keys-file keys.txt \
             --changes-path translation_changes.json
+          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -f translation_changes.json ]; then
+            cat translation_changes.json >> "$GITHUB_OUTPUT"
+          else
+            echo "[]" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
 
       # PR本文に埋めるログを出力へ
       - name: Collect change log for PR body

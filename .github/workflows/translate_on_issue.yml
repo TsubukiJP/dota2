@@ -1,4 +1,4 @@
-name: 自然文プロンプトで翻訳PR（Issue）
+name: プロンプトから翻訳
 
 on:
   issues:
@@ -13,10 +13,11 @@ jobs:
   translate:
     if: ${{ github.event.issue.pull_request == null }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -25,6 +26,8 @@ jobs:
 
       - name: Save issue body as prompt
         run: |
+          python -m pip install --upgrade pip
+          pip install requests pyyaml
           printf "%s" "${{ github.event.issue.body }}" > issue_prompt.txt
 
       - name: Resolve keys from natural-language prompt
@@ -37,20 +40,30 @@ jobs:
       - name: Abort if no targets
         id: guard
         run: |
-          if [ ! -s keys.txt ]; then
-            echo "empty=true" >> $GITHUB_OUTPUT
-          fi
+          if [ ! -s keys.txt ]; then echo "empty=true" >> "$GITHUB_OUTPUT"; fi
 
       - name: Comment (no targets found)
         if: steps.guard.outputs.empty == 'true'
         run: |
-          gh issue comment ${{ github.event.issue.number }} --body "🛑 プロンプトから対象キーを特定できませんでした。キーワードや行レンジをもう少し具体化してみてください。"
+          gh issue comment ${{ github.event.issue.number }} --body "🛑 自然文プロンプトから対象キーを特定できませんでした。キーワードや行レンジ、ファイル名をもう少し具体化してみてください。"
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Exit early
         if: steps.guard.outputs.empty == 'true'
         run: exit 0
+
+      - name: Collect resolve metrics
+        id: metrics
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          with open('resolved_targets.json', encoding='utf-8') as f:
+              d = json.load(f)
+          print(f"kept={d.get('kept',0)}")
+          print(f"total={d.get('total_found',0)}")
+          print(f"truncated={'true' if d.get('truncated') else 'false'}")
+          PY
 
       - name: Run AI translation (auto-select EN/JP paths)
         env:
@@ -78,15 +91,18 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           branch: i18n/issue-${{ github.run_id }}
-          title: "chore(i18n): プロンプトから自動翻訳 (#{${{ github.event.issue.number }}})"
+          title: "chore(i18n): プロンプトから自動翻訳 (#${{ github.event.issue.number }})"
           commit-message: "chore(i18n): apply translations from issue prompt"
           add-paths: |
             main/resource/localization/*_japanese.txt.json
             resolved_targets.json
             translation_changes.json
+          labels: |
+            translate
+            automated
           body: |
-            Issue本文を解析して抽出したキーを翻訳しました。
-
+            Issue本文（自然文プロンプト）を解析して抽出したキーを翻訳しました。
             - 解析ログ: `resolved_targets.json`
             - 変更一覧: `translation_changes.json`
+            - 件数: kept=${{ steps.metrics.outputs.kept }} / total=${{ steps.metrics.outputs.total }} (truncated=${{ steps.metrics.outputs.truncated }})
             - 実行Issue: #${{ github.event.issue.number }}

@@ -1,0 +1,101 @@
+name: Translate (Issue-triggered)
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  translate:
+    if: >-
+      contains(github.event.issue.title, 'translate') ||
+      contains(github.event.issue.title, 'Translate') ||
+      contains(github.event.issue.body, '```yaml') ||
+      contains(join(fromJson(toJson(github.event.issue.labels)).*.name, ','), 'translate')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyyaml
+
+      - name: Parse issue config
+        id: cfg
+        run: |
+          python scripts/python/issue_parse_config.py <<'EOF'
+          $ISSUE_BODY
+          EOF
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+
+      - name: Run translation
+        id: run_translate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -e
+          EN="${{ steps.cfg.outputs.english }}"
+          JA="${{ steps.cfg.outputs.japanese }}"
+          BASE="${{ steps.cfg.outputs.base }}"
+          HEAD="${{ steps.cfg.outputs.head }}"
+          EXTRA=""
+          if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
+            EXTRA="$EXTRA --base \"${BASE:-}\" --head \"${HEAD:-}\""
+          fi
+          if [ -n "${{ steps.cfg.outputs.filter_key }}" ]; then
+            EXTRA="$EXTRA --filter-key \"${{ steps.cfg.outputs.filter_key }}\""
+          fi
+          if [ -n "${{ steps.cfg.outputs.filter_value }}" ]; then
+            EXTRA="$EXTRA --filter-value \"${{ steps.cfg.outputs.filter_value }}\""
+          fi
+          if [ -n "${{ steps.cfg.outputs.keys }}" ]; then
+            printf "%s" "${{ steps.cfg.outputs.keys }}" > keys.txt
+            EXTRA="$EXTRA --keys-file keys.txt"
+          fi
+          python scripts/python/translate_diff_ai.py \
+            --english "$EN" \
+            --japanese "$JA" \
+            $EXTRA
+          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -f translation_changes.json ]; then
+            cat translation_changes.json >> "$GITHUB_OUTPUT"
+          else
+            echo "[]" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/translate/${{ steps.cfg.outputs.target }}-${{ github.event.issue.number }}
+          title: |
+            AI翻訳: ${{ steps.cfg.outputs.target }} (issue #${{ github.event.issue.number }})
+          body: |
+            自動生成: issue #${{ github.event.issue.number }} 起動
+
+            対象: `${{ steps.cfg.outputs.english }}` → `${{ steps.cfg.outputs.japanese }}`
+
+            変更サマリ:
+
+            ```json
+            ${{ steps.run_translate.outputs.changes || '' }}
+            ```
+          add-paths: |
+            ${{ steps.cfg.outputs.japanese }}
+            translation_changes.json
+          labels: |
+            translate
+            automated

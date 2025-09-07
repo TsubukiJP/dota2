@@ -30,19 +30,40 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyyaml
 
-      - name: Run translation for diff
-        id: run_translate
+      - name: Extract changed keys
+        id: extract
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -e
+          EN='main/resource/localization/abilities_english.txt.json'
+          RANGE="${BEFORE_SHA:-HEAD^}..${GITHUB_SHA}"
+          git diff -U0 "$RANGE" -- "$EN" \
+            | grep -E '^\+\s*"[^"]+"\s*:' \
+            | sed -E 's/^\+\s*"([^"]+)".*/\1/' \
+            | sort -u > keys.txt || true
+          if [ ! -s keys.txt ]; then echo "empty=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Skip if no changed keys
+        if: steps.extract.outputs.empty == 'true'
+        run: echo "No changed localization keys. Exit."; exit 0
+
+      - name: Run AI translation (keys.txt)
+        id: run_translate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
           EN='main/resource/localization/abilities_english.txt.json'
           JA='main/resource/localization/abilities_japanese.txt.json'
           python scripts/python/translate_diff_ai.py \
             --english "$EN" \
             --japanese "$JA" \
-            --commit-range "${BEFORE_SHA:-HEAD^}..${GITHUB_SHA}"
+            --keys-file keys.txt \
+            --changes-path translation_changes.json
+
+      # PR本文に埋めるログを出力へ
+      - name: Collect change log for PR body
+        run: |
           echo "changes<<EOF" >> "$GITHUB_OUTPUT"
           if [ -f translation_changes.json ]; then
             cat translation_changes.json >> "$GITHUB_OUTPUT"

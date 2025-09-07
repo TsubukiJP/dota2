@@ -1,8 +1,9 @@
-name: Translate (Issue-triggered)
+name: 自然文プロンプトで翻訳PR（Issue）
 
 on:
   issues:
     types: [opened, edited]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,102 +11,82 @@ permissions:
 
 jobs:
   translate:
+    if: ${{ github.event.issue.pull_request == null }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install deps
+      - name: Save issue body as prompt
         run: |
-          python -m pip install --upgrade pip
-          pip install requests pyyaml
+          printf "%s" "${{ github.event.issue.body }}" > issue_prompt.txt
 
-      - name: Save issue body
-        run: printf "%s" "${{ github.event.issue.body }}" > issue_prompt.txt
-
-      - name: Resolve keys from prompt
-        id: resolve
+      - name: Resolve keys from natural-language prompt
         run: |
           python scripts/python/issue_prompt_resolver.py \
             --prompt-file issue_prompt.txt \
             --english-paths "main/resource/localization/abilities_english.txt.json,main/resource/localization/dota_english.txt.json,main/resource/localization/gameui_english.txt.json" \
             --max-keys 200
 
-      - name: Check targets
-        id: chk
+      - name: Abort if no targets
+        id: guard
         run: |
-          if [ ! -s keys.txt ]; then echo "empty=true" >> "$GITHUB_OUTPUT"; else echo "empty=false" >> "$GITHUB_OUTPUT"; fi
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          d=json.load(open('resolved_targets.json',encoding='utf-8'))
-          print(f"kept={d.get('kept',0)}")
-          print(f"total={d.get('total_found',0)}")
-          print(f"truncated={'true' if d.get('truncated') else 'false'}")
-          PY
+          if [ ! -s keys.txt ]; then
+            echo "empty=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Comment: no targets
-        if: steps.chk.outputs.empty == 'true'
+      - name: Comment (no targets found)
+        if: steps.guard.outputs.empty == 'true'
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "🛑 プロンプトから対象キーを特定できませんでした。キーワードや行レンジをもう少し具体化してみてください。"
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -f body='解析の結果、対象キーが見つかりませんでした。プロンプト（キーワードや行レンジ、ファイル名）をご確認ください。'
 
-      - name: Stop when no targets
-        if: steps.chk.outputs.empty == 'true'
+      - name: Exit early
+        if: steps.guard.outputs.empty == 'true'
         run: exit 0
 
-      - name: Run translation
-        id: run_translate
+      - name: Run AI translation (auto-select EN/JP paths)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          set -e
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "::error::OPENAI_API_KEY is not set. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
           python scripts/python/translate_diff_ai.py \
             --english-auto \
             --japanese-auto \
             --keys-file keys.txt \
             --changes-path translation_changes.json
-          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
-          if [ -f translation_changes.json ]; then
-            cat translation_changes.json >> "$GITHUB_OUTPUT"
-          else
-            echo "[]" >> "$GITHUB_OUTPUT"
-          fi
-          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload logs (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-issue-${{ github.run_id }}
+          path: |
+            resolved_targets.json
+            translation_changes.json
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
           branch: i18n/issue-${{ github.run_id }}
-          title: "chore(i18n): 自然言語プロンプト翻訳 (#${{ github.event.issue.number }})"
+          title: "chore(i18n): プロンプトから自動翻訳 (#{${{ github.event.issue.number }}})"
           commit-message: "chore(i18n): apply translations from issue prompt"
+          add-paths: |
+            main/resource/localization/*_japanese.txt.json
+            resolved_targets.json
+            translation_changes.json
           body: |
-            自然言語のIssueプロンプトから抽出したキーで自動翻訳を適用しました。
+            Issue本文を解析して抽出したキーを翻訳しました。
 
             - 解析ログ: `resolved_targets.json`
             - 変更一覧: `translation_changes.json`
-
-            件数: kept=${{ steps.chk.outputs.kept }} / total=${{ steps.chk.outputs.total }} (truncated=${{ steps.chk.outputs.truncated }})
-          add-paths: |
-            main/resource/localization/*_japanese.txt.json
-            translation_changes.json
-            resolved_targets.json
-          labels: |
-            translate
-            automated
-
-      - name: Comment summary
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -f body='翻訳PRを作成しました。件数: kept=${{ steps.chk.outputs.kept }} / total=${{ steps.chk.outputs.total }} (truncated=${{ steps.chk.outputs.truncated }}).'
-
+            - 実行Issue: #${{ github.event.issue.number }}

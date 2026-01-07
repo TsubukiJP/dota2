@@ -23,12 +23,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # workflow_run の場合はそのトリガーとなったコミット (head_sha)
-          # workflow_dispatch の場合はデフォルト (github.sha/ref) になるようフォールバック... 
-          # だが empty string だと checkout v4 は default behavior (correct ref) をとる特性を利用できるか？
-          # 安全策: workflow_run.head_sha があればそれ、なければ github.sha
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2  # changed判定(HEAD~1)のため
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -80,4 +76,5 @@ jobs:
           add-paths: |
             main/resource/localization/*_japanese.txt.json
             docs/glossary.csv
-            docs/ai_rules.md
+            docs/ai_rules_*.md
+            docs/profile_config.yaml

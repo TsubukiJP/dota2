@@ -9,5 +9,19 @@
     "chat_say_team": "Say (TEAM):",
     "chat_say_coach": "Say (TO STUDENTS):",
     "chat_say_student": "Say (TO COACH):",
-    "chat_sourcetv": "(Dota TV) %s1"
+    "chat_sourcetv": "(Dota TV) %s1",
+    "MOCK_TEST_CHAT_START": "=== MOCK TEST DATA ===",
+    "chat_mock_welcome": "Welcome to the test server!",
+    "chat_mock_goodbye": "Thanks for playing. See you next time!",
+    "chat_mock_gg": "Good game, well played!",
+    "chat_mock_gl": "Good luck, have fun!",
+    "chat_mock_pause": "Game paused. Please wait.",
+    "chat_mock_resume": "Game resumed. Get ready!",
+    "chat_mock_tip_ward": "Tip: Place wards in strategic locations for better vision.",
+    "chat_mock_tip_farm": "Tip: Focus on last-hitting creeps to maximize your gold income.",
+    "chat_mock_tip_team": "Tip: Stick with your team during late game team fights.",
+    "chat_mock_report": "Player reported. Thank you for helping improve the community.",
+    "chat_mock_muted": "You have been muted by the system for {d:duration} minutes.",
+    "chat_mock_unmuted": "Your mute has expired. You can now chat again.",
+    "MOCK_TEST_CHAT_END": "=== END OF MOCK TEST DATA ==="
 }

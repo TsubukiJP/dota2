@@ -1,0 +1,34 @@
+# 翻訳プロファイル設定
+
+# 共通
+common:
+  prepend: "ai_rules_base.md"      # 最初に結合
+  append: "ai_rules_checklist.md"  # 最後に結合
+
+# プロファイル
+profiles:
+  # 1. アビリティ・戦闘関連
+  abilities:
+    pattern: ["abilities_english"]
+    rules: 
+      - "ai_rules_abilities.md"
+
+  # 2. UI + アビリティツールチップ
+  ui_complex:
+    pattern: ["dota_english", "broadcastfacts", "chat", "leagues", "teamfandom"]
+    rules:
+      - "ai_rules_abilities.md"
+      - "ai_rules_ui.md"
+
+  # 3. UIのみ
+  ui_simple:
+    pattern: ["gameui", "richpresence"]
+    rules:
+      - "ai_rules_ui.md"
+
+  # 4. イベント
+  event:
+    pattern: ["addon_english"]
+    rules:
+      - "ai_rules_abilities.md"
+      - "ai_rules_event.md"

@@ -2,6 +2,25 @@ name: Translate Dota 2 Localization
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Translation Mode'
+        required: true
+        default: 'diff'
+        type: choice
+        options:
+          - diff
+          - missing
+          - changed
+          - missing+changed
+      base_commit:
+        description: 'Base commit for diff mode (e.g., HEAD~1, abc123^)'
+        required: false
+        default: 'HEAD~1'
+      max_items:
+        description: 'Max items to translate (0 = unlimited)'
+        required: false
+        default: '0'
   workflow_run:
     workflows: ["Fetch localization data with SteamCMD"]
     types: [completed]
@@ -24,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0  # Full history for flexible diff
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,7 +60,24 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python scripts/python/translate.py --mode missing+changed
+          # Build command arguments
+          MODE="${{ github.event.inputs.mode || 'diff' }}"
+          ARGS="--mode $MODE"
+          
+          # Base commit for diff mode
+          BASE_COMMIT="${{ github.event.inputs.base_commit || 'HEAD~1' }}"
+          if [ "$MODE" == "diff" ]; then
+            ARGS="$ARGS --base-commit $BASE_COMMIT"
+          fi
+          
+          MAX_ITEMS="${{ github.event.inputs.max_items || '0' }}"
+          if [ "$MAX_ITEMS" != "0" ]; then
+            ARGS="$ARGS --max-items $MAX_ITEMS"
+          fi
+          
+          echo "Running: python scripts/python/translate.py $ARGS"
+          python scripts/python/translate.py $ARGS
+
 
       - name: Build artifact
         run: |

@@ -248,7 +248,57 @@ def get_old_file_content(filepath: str) -> Dict[str, Any]:
         logger.error(f"旧ファイルコンテンツの取得エラー: {e}")
         return {}
 
-def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any], filepath: str, mode: str, min_change_ratio: float = 0.0) -> Dict[str, str]:
+def get_diff_keys(base_commit: str = "HEAD~1") -> Dict[str, set]:
+    """指定されたコミットとの差分から追加/変更されたキーを抽出します。
+    
+    Returns:
+        Dict[str, set]: ファイル名をキー、変更されたキーのセットを値とする辞書
+    """
+    diff_keys = {}  # {filename: {key1, key2, ...}}
+    
+    try:
+        # git diff で変更行を取得
+        result = subprocess.run(
+            ["git", "diff", base_commit, "HEAD", "--unified=0", "--", "*_english.txt.json"],
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+        
+        if result.returncode != 0:
+            logger.warning(f"git diff 実行エラー: {result.stderr}")
+            return {}
+        
+        current_file = None
+        key_pattern = re.compile(r'^\+\s*"([^"]+)"\s*:\s*"')
+        file_pattern = re.compile(r'^\+\+\+ b/(.+)$')
+        
+        for line in result.stdout.split('\n'):
+            # ファイル名を検出
+            file_match = file_pattern.match(line)
+            if file_match:
+                current_file = os.path.basename(file_match.group(1))
+                if current_file not in diff_keys:
+                    diff_keys[current_file] = set()
+                continue
+            
+            # 追加された行からキーを抽出 (+で始まる行、ただし+++は除く)
+            if line.startswith('+') and not line.startswith('+++'):
+                key_match = key_pattern.match(line)
+                if key_match and current_file:
+                    diff_keys[current_file].add(key_match.group(1))
+        
+        total_keys = sum(len(keys) for keys in diff_keys.values())
+        logger.info(f"差分から {total_keys} 件のキーを検出 ({len(diff_keys)} ファイル)")
+        
+        return diff_keys
+        
+    except Exception as e:
+        logger.error(f"差分キーの取得エラー: {e}")
+        return {}
+
+
+def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any], filepath: str, mode: str, min_change_ratio: float = 0.0, diff_keys: set = None) -> Dict[str, str]:
     """翻訳が必要なキーを特定します。"""
     to_translate = {}
     
@@ -267,17 +317,30 @@ def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any]
         needs_translation = False
         jp_text = jp_tokens.get(key)
         
-        # 1. 新規チェック
-        if mode in ['missing', 'missing+changed']:
-             if not jp_text: 
+        # 0. diffモード: 差分キーのみを対象
+        if mode == 'diff':
+            if diff_keys and key in diff_keys:
                 needs_translation = True
         
-        # 2. 変更チェック
-        if not needs_translation and mode in ['changed', 'missing+changed']:
+        # 1. 新規チェック
+        elif mode in ['missing', 'missing+changed']:
+             if not jp_text: 
+                needs_translation = True
+             
+             # 2. 変更チェック（missing+changedの場合）
+             if not needs_translation and mode == 'missing+changed':
+                if key in old_eng_tokens:
+                    old_text = old_eng_tokens[key]
+                    if old_text != eng_text:
+                        needs_translation = True
+                elif key not in old_eng_tokens:
+                     needs_translation = True
+        
+        # 3. changedのみ
+        elif mode == 'changed':
             if key in old_eng_tokens:
                 old_text = old_eng_tokens[key]
                 if old_text != eng_text:
-                    # TODO: ここに min_change_ratio のチェック（レーベンシュタイン距離など）を実装可能
                     needs_translation = True
             elif key not in old_eng_tokens:
                  needs_translation = True
@@ -417,8 +480,10 @@ def parse_arguments():
     """コマンドライン引数を解析します。"""
     parser = argparse.ArgumentParser(description='Gemini APIを使用したDota 2自動翻訳スクリプト')
     
-    parser.add_argument('--mode', choices=['missing', 'changed', 'missing+changed'], default='missing+changed',
-                        help='翻訳モード: missing (新規)、changed (更新)、または両方。')
+    parser.add_argument('--mode', choices=['missing', 'changed', 'missing+changed', 'diff'], default='missing+changed',
+                        help='翻訳モード: missing (新規)、changed (更新)、両方、または diff (コミット差分のみ)。')
+    parser.add_argument('--base-commit', type=str, default='HEAD~1',
+                        help='diffモードで比較するベースコミット (デフォルト: HEAD~1)。')
     parser.add_argument('--max-items', type=int, default=0,
                         help='翻訳する最大キー数（0は無制限）。')
     parser.add_argument('--priority', type=str, nargs='+',
@@ -482,7 +547,18 @@ def main():
         eng_data = load_json_file(file_path)
         jp_data = load_json_file(jp_file_path)
         
-        to_translate_map = identify_changes(eng_data, jp_data, file_path, args.mode, args.min_change_ratio)
+        # diffモードの場合は事前に差分キーを取得
+        file_diff_keys = None
+        if args.mode == 'diff':
+            if 'all_diff_keys' not in dir():
+                all_diff_keys = get_diff_keys(args.base_commit)
+            basename = os.path.basename(file_path)
+            file_diff_keys = all_diff_keys.get(basename, set())
+            if not file_diff_keys:
+                logger.info(f"差分キーがありません: {basename}")
+                continue
+        
+        to_translate_map = identify_changes(eng_data, jp_data, file_path, args.mode, args.min_change_ratio, file_diff_keys)
         
         keys_to_process = list(to_translate_map.keys())
         

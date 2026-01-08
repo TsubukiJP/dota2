@@ -9,5 +9,19 @@
     "chat_say_coach": "発言(生徒へ):",
     "chat_say_student": "発言(コーチへ):",
     "chat_sourcetv": "(Dota TV) %s1",
-    "chat_say_team": "発言(チーム):"
+    "chat_say_team": "発言(チーム):",
+    "MOCK_TEST_CHAT_START": "=== モックテストデータ ===",
+    "chat_mock_welcome": "テストサーバーへようこそ！",
+    "chat_mock_goodbye": "プレイしてくれてありがとう。またね！",
+    "chat_mock_gg": "良い試合でした、ナイスプレイ！",
+    "chat_mock_gl": "頑張って、楽しんで！",
+    "chat_mock_pause": "ゲームは一時停止しました。お待ちください。",
+    "chat_mock_resume": "ゲーム再開。準備して！",
+    "chat_mock_tip_ward": "ヒント：視界を広げるため、戦略的な位置にワードを設置しましょう。",
+    "chat_mock_tip_farm": "ヒント：クリープのラストヒットに集中して、ゴールド収入を最大化しましょう。",
+    "chat_mock_tip_team": "ヒント：レイトゲームの集団戦ではチームと行動を共にしましょう。",
+    "chat_mock_report": "プレイヤーを報告しました。コミュニティ改善にご協力いただきありがとうございます。",
+    "chat_mock_muted": "システムにより{d:duration}分間ミュートされました。",
+    "chat_mock_unmuted": "ミュートが解除されました。チャットが可能になりました。",
+    "MOCK_TEST_CHAT_END": "=== モックテストデータ終了 ==="
 }

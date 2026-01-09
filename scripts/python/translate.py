@@ -786,6 +786,25 @@ def main():
     print(f"違反数: {total_violation_count}", flush=True)
     print(f"所要時間: {elapsed_min}分{elapsed_sec}秒", flush=True)
     log_separator()
+    
+    # サマリーJSONを出力（ワークフローで使用）
+    summary_data = {
+        "model": MODEL_NAME,
+        "mode": args.mode,
+        "files_processed": files_processed,
+        "batch_count": total_batch_count,
+        "translation_count": total_processed_count,
+        "violation_count": total_violation_count,
+        "elapsed_time": f"{elapsed_min}分{elapsed_sec}秒",
+        "translated_files": [os.path.basename(f) for f in target_files if os.path.exists(f.replace("_english", "_japanese"))]
+    }
+    
+    try:
+        with open("translation_summary.json", 'w', encoding='utf-8') as f:
+            json.dump(summary_data, f, ensure_ascii=False, indent=2)
+        logger.info("サマリーを保存しました: translation_summary.json")
+    except Exception as e:
+        logger.error(f"サマリー保存失敗: {e}")
 
 if __name__ == "__main__":
     main()

@@ -21,6 +21,18 @@ on:
         description: 'Max items to translate (0 = unlimited)'
         required: false
         default: '0'
+      target_file:
+        description: 'Target file (e.g., dota_english.txt.json). Empty = all files'
+        required: false
+        default: ''
+      from_line:
+        description: 'Start line (for target_file)'
+        required: false
+        default: '1'
+      to_line:
+        description: 'End line (for target_file, empty = EOF)'
+        required: false
+        default: ''
   workflow_run:
     workflows: ["Fetch localization data with SteamCMD"]
     types: [completed]
@@ -73,6 +85,18 @@ jobs:
           MAX_ITEMS="${{ github.event.inputs.max_items || '0' }}"
           if [ "$MAX_ITEMS" != "0" ]; then
             ARGS="$ARGS --max-items $MAX_ITEMS"
+          fi
+          
+          # Target file with line range
+          TARGET_FILE="${{ github.event.inputs.target_file }}"
+          if [ -n "$TARGET_FILE" ]; then
+            ARGS="$ARGS --target-file $TARGET_FILE"
+            FROM_LINE="${{ github.event.inputs.from_line || '1' }}"
+            ARGS="$ARGS --from-line $FROM_LINE"
+            TO_LINE="${{ github.event.inputs.to_line }}"
+            if [ -n "$TO_LINE" ]; then
+              ARGS="$ARGS --to-line $TO_LINE"
+            fi
           fi
           
           echo "Running: python scripts/python/translate.py $ARGS"

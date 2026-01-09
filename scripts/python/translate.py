@@ -14,7 +14,6 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # ログ設定
-# ログ設定
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -24,6 +23,32 @@ logger = logging.getLogger(__name__)
 
 # 定数
 MODEL_NAME = 'gemini-2.5-flash'
+BATCH_SIZE = 20
+
+# GitHub Actions 用ログヘルパー
+def log_separator(title: str = None):
+    """区切り線"""
+    print("="*50)
+    if title:
+        print(f"[{title}]")
+        print("="*50)
+
+def log_warning_group(key: str, errors: List[str]):
+    """検証エラー"""
+    print(f"::warning::検証エラー: {key}")
+    if len(errors) > 1:
+        print(f"::group::詳細 ({len(errors)}件)")
+        for error in errors:
+            print(f"  - {error}")
+        print("::endgroup::")
+    else:
+        for error in errors:
+            logger.warning(f"  - {error}")
+
+def log_progress(current: int, total: int, filename: str, count: int):
+    """進捗"""
+    print(f"[{current}/{total}] 翻訳中: {filename} ({count}件)")
+
 
 def load_profile_config(docs_dir: str) -> Dict[str, Any]:
     """プロファイル設定ファイル (YAML) を読み込みます。"""
@@ -248,6 +273,44 @@ def get_old_file_content(filepath: str) -> Dict[str, Any]:
         logger.error(f"旧ファイルコンテンツの取得エラー: {e}")
         return {}
 
+def get_keys_in_line_range(filepath: str, from_line: int = 1, to_line: int = None) -> set:
+    """指定された行範囲内にあるJSONキーを抽出します。
+    
+    Args:
+        filepath: JSONファイルのパス
+        from_line: 開始行番号 (1-indexed)
+        to_line: 終了行番号 (1-indexed、Noneの場合はファイル末尾まで)
+    
+    Returns:
+        set: 行範囲内に存在するキーのセット
+    """
+    keys_in_range = set()
+    key_pattern = re.compile(r'^\s*"([^"]+)"\s*:\s*"')
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        if to_line is None:
+            to_line = len(lines)
+        
+        # 1-indexed -> 0-indexed
+        start_idx = max(0, from_line - 1)
+        end_idx = min(len(lines), to_line)
+        
+        for i in range(start_idx, end_idx):
+            line = lines[i]
+            match = key_pattern.match(line)
+            if match:
+                keys_in_range.add(match.group(1))
+        
+        logger.info(f"行範囲 {from_line}-{to_line} から {len(keys_in_range)} 件のキーを検出")
+        return keys_in_range
+        
+    except Exception as e:
+        logger.error(f"行範囲キー取得エラー: {e}")
+        return set()
+
 def get_diff_keys(base_commit: str = "HEAD~1") -> Dict[str, set]:
     """指定されたコミットとの差分から追加/変更されたキーを抽出します。
     
@@ -466,7 +529,7 @@ Input:
                 if is_valid:
                     validated_data[key] = translated_text
                 else:
-                    logger.warning(f"検証エラー {key}: {errors}")
+                    log_warning_group(key, errors)
             
             return validated_data
 
@@ -497,11 +560,30 @@ def parse_arguments():
     parser.add_argument('--dry-run', action='store_true',
                         help='API呼び出しやファイル保存を行わずに実行します。')
     
+    # ターゲットファイル・行範囲指定
+    parser.add_argument('--target-file', type=str, default=None,
+                        help='翻訳対象のファイル名 (例: dota_english.txt.json)。指定時はこのファイルのみ処理。')
+    parser.add_argument('--from-line', type=int, default=1,
+                        help='--target-file指定時の開始行番号 (デフォルト: 1)。')
+    parser.add_argument('--to-line', type=int, default=None,
+                        help='--target-file指定時の終了行番号 (デフォルト: ファイル末尾)。')
+    
     return parser.parse_args()
 
 def main():
+    start_time = time.time()
     args = parse_arguments()
-    logger.info(f"翻訳プロセスを開始します。モード: {args.mode}, ドライラン: {args.dry_run}")
+    
+    # 開始バナー
+    log_separator("START")
+    print(f"翻訳プロセス開始")
+    print(f"モード: {args.mode}")
+    if args.mode == 'diff':
+        print(f"基準コミット: {args.base_commit}")
+    if args.target_file:
+        print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})")
+    print(f"ドライラン: {args.dry_run}")
+    log_separator()
     
     # APIキーチェック
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -531,8 +613,24 @@ def main():
     else:
         logger.error(f"リソースディレクトリが見つかりません: {resource_dir}")
         sys.exit(1)
+    
+    # --target-file が指定されている場合、そのファイルのみを処理
+    if args.target_file:
+        target_files = [f for f in target_files if args.target_file in f]
+        if not target_files:
+            logger.error(f"指定されたファイルが見つかりません: {args.target_file}")
+            sys.exit(1)
+        logger.info(f"対象ファイル: {target_files[0]} (行範囲: {args.from_line}-{args.to_line or 'EOF'})")
+    
+    # 行範囲フィルタ用のキーセット
+    line_range_keys = None
+    if args.target_file and (args.from_line > 1 or args.to_line is not None):
+        line_range_keys = get_keys_in_line_range(target_files[0], args.from_line, args.to_line)
         
     total_processed_count = 0
+    total_batch_count = 0
+    total_violation_count = 0
+    files_processed = 0
     unprocessed_keys_report = {} # Key: {file_path, error}
 
     for file_path in target_files:
@@ -559,6 +657,12 @@ def main():
                 continue
         
         to_translate_map = identify_changes(eng_data, jp_data, file_path, args.mode, args.min_change_ratio, file_diff_keys)
+        
+        # 行範囲フィルタが有効な場合、キーをフィルタリング
+        if line_range_keys is not None:
+            filtered_map = {k: v for k, v in to_translate_map.items() if k in line_range_keys}
+            logger.info(f"行範囲フィルタ適用: {len(to_translate_map)} -> {len(filtered_map)} 件")
+            to_translate_map = filtered_map
         
         keys_to_process = list(to_translate_map.keys())
         
@@ -618,7 +722,11 @@ def main():
                     jp_tokens_ref[k] = "[DRY_RUN] " + batch_dict[k]
                 continue
             
-            logger.info(f"バッチ翻訳を実行中 {i // batch_size + 1}...")
+            batch_num = i // BATCH_SIZE + 1
+            total_batches = (len(keys_to_process) + BATCH_SIZE - 1) // BATCH_SIZE
+            log_progress(batch_num, total_batches, os.path.basename(file_path), len(batch_dict))
+            total_batch_count += 1
+            
             # ここで --strict-force を渡す
             translated_batch = translate_batch(batch_dict, glossary, ai_rules, args.strict_force)
             
@@ -628,6 +736,9 @@ def main():
             for k in batch_dict:
                 if k not in translated_batch:
                      unprocessed_keys_report[k] = {"file": os.path.basename(file_path), "error": "検証失敗またはAPIエラー"}
+                     total_violation_count += 1
+
+        files_processed += 1
 
         if not args.dry_run:
             save_json_file(jp_file_path, jp_data)
@@ -651,7 +762,19 @@ def main():
             logger.error("Strict(Unprocessed)モード有効: 未処理キーが存在するため異常終了します。")
             sys.exit(1)
 
-    logger.info("翻訳プロセスが完了しました。")
+    # 完了サマリー
+    elapsed_time = time.time() - start_time
+    elapsed_min = int(elapsed_time // 60)
+    elapsed_sec = int(elapsed_time % 60)
+    
+    log_separator("SUMMARY")
+    print(f"翻訳完了")
+    print(f"処理ファイル: {files_processed}")
+    print(f"バッチ数: {total_batch_count}")
+    print(f"翻訳キー数: {total_processed_count}")
+    print(f"違反数: {total_violation_count}")
+    print(f"所要時間: {elapsed_min}分{elapsed_sec}秒")
+    log_separator()
 
 if __name__ == "__main__":
     main()

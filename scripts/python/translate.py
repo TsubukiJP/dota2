@@ -28,26 +28,27 @@ BATCH_SIZE = 20
 # GitHub Actions 用ログヘルパー
 def log_separator(title: str = None):
     """区切り線"""
-    print("="*50)
+    print("="*50, flush=True)
     if title:
-        print(f"[{title}]")
-        print("="*50)
+        print(f"[{title}]", flush=True)
+        print("="*50, flush=True)
 
 def log_warning_group(key: str, errors: List[str]):
     """検証エラー"""
-    print(f"::warning::検証エラー: {key}")
+    print(f"::warning::検証エラー: {key}", flush=True)
     if len(errors) > 1:
-        print(f"::group::詳細 ({len(errors)}件)")
+        print(f"::group::詳細 ({len(errors)}件)", flush=True)
         for error in errors:
-            print(f"  - {error}")
-        print("::endgroup::")
+            print(f"  - {error}", flush=True)
+        print("::endgroup::", flush=True)
     else:
         for error in errors:
-            logger.warning(f"  - {error}")
+            print(f"  - {error}", flush=True)
 
 def log_progress(current: int, total: int, filename: str, count: int):
     """進捗"""
-    print(f"[{current}/{total}] 翻訳中: {filename} ({count}件)")
+    print(f"[{current}/{total}] 翻訳中: {filename} ({count}件)", flush=True)
+
 
 
 def load_profile_config(docs_dir: str) -> Dict[str, Any]:
@@ -586,13 +587,13 @@ def main():
     
     # 開始バナー
     log_separator("START")
-    print(f"翻訳プロセス開始")
-    print(f"モード: {args.mode}")
+    print(f"翻訳プロセス開始", flush=True)
+    print(f"モード: {args.mode}", flush=True)
     if args.mode == 'diff':
-        print(f"基準コミット: {args.base_commit}")
+        print(f"基準コミット: {args.base_commit}", flush=True)
     if args.mode == 'range' or args.target_file:
-        print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})")
-    print(f"ドライラン: {args.dry_run}")
+        print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})", flush=True)
+    print(f"ドライラン: {args.dry_run}", flush=True)
     log_separator()
     
     # APIキーチェック
@@ -778,12 +779,12 @@ def main():
     elapsed_sec = int(elapsed_time % 60)
     
     log_separator("SUMMARY")
-    print(f"翻訳完了")
-    print(f"処理ファイル: {files_processed}")
-    print(f"バッチ数: {total_batch_count}")
-    print(f"翻訳キー数: {total_processed_count}")
-    print(f"違反数: {total_violation_count}")
-    print(f"所要時間: {elapsed_min}分{elapsed_sec}秒")
+    print(f"翻訳完了", flush=True)
+    print(f"処理ファイル: {files_processed}", flush=True)
+    print(f"バッチ数: {total_batch_count}", flush=True)
+    print(f"翻訳キー数: {total_processed_count}", flush=True)
+    print(f"違反数: {total_violation_count}", flush=True)
+    print(f"所要時間: {elapsed_min}分{elapsed_sec}秒", flush=True)
     log_separator()
 
 if __name__ == "__main__":

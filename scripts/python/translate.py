@@ -385,6 +385,11 @@ def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any]
             if diff_keys and key in diff_keys:
                 needs_translation = True
         
+        # 0.5. rangeモード: 行範囲フィルタは後段で適用、全キー対象（missing扱い）
+        elif mode == 'range':
+            if not jp_text:
+                needs_translation = True
+        
         # 1. 新規チェック
         elif mode in ['missing', 'missing+changed']:
              if not jp_text: 
@@ -543,8 +548,8 @@ def parse_arguments():
     """コマンドライン引数を解析します。"""
     parser = argparse.ArgumentParser(description='Gemini APIを使用したDota 2自動翻訳スクリプト')
     
-    parser.add_argument('--mode', choices=['missing', 'changed', 'missing+changed', 'diff'], default='missing+changed',
-                        help='翻訳モード: missing (新規)、changed (更新)、両方、または diff (コミット差分のみ)。')
+    parser.add_argument('--mode', choices=['missing', 'changed', 'missing+changed', 'diff', 'range'], default='missing+changed',
+                        help='翻訳モード: missing, changed, missing+changed, diff (コミット差分), range (ファイル+行範囲)。')
     parser.add_argument('--base-commit', type=str, default='HEAD~1',
                         help='diffモードで比較するベースコミット (デフォルト: HEAD~1)。')
     parser.add_argument('--max-items', type=int, default=0,
@@ -574,13 +579,18 @@ def main():
     start_time = time.time()
     args = parse_arguments()
     
+    # range モードのバリデーション
+    if args.mode == 'range' and not args.target_file:
+        logger.error("エラー: --mode range には --target-file が必須です。")
+        sys.exit(1)
+    
     # 開始バナー
     log_separator("START")
     print(f"翻訳プロセス開始")
     print(f"モード: {args.mode}")
     if args.mode == 'diff':
         print(f"基準コミット: {args.base_commit}")
-    if args.target_file:
+    if args.mode == 'range' or args.target_file:
         print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})")
     print(f"ドライラン: {args.dry_run}")
     log_separator()

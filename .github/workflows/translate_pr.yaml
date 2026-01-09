@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - diff
+          - range
           - missing
           - changed
           - missing+changed
@@ -22,7 +23,7 @@ on:
         required: false
         default: '0'
       target_file:
-        description: 'Target file (e.g., dota_english.txt.json). Empty = all files'
+        description: 'Target file (required for range mode, e.g., dota_english.txt.json)'
         required: false
         default: ''
       from_line:

@@ -33,17 +33,81 @@ def log_separator(title: str = None):
         print(f"[{title}]", flush=True)
         print("="*50, flush=True)
 
-def log_warning_group(key: str, errors: List[str]):
-    """検証エラー"""
-    print(f"::warning::検証エラー: {key}", flush=True)
-    if len(errors) > 1:
-        print(f"::group::詳細 ({len(errors)}件)", flush=True)
-        for error in errors:
-            print(f"  - {error}", flush=True)
-        print("::endgroup::", flush=True)
-    else:
-        for error in errors:
-            print(f"  - {error}", flush=True)
+def log_warning_group(key: str, errors: List[str], context: Dict[str, Any] = None):
+    """検証エラーを構造化された形式で出力します。"""
+    from collections import Counter
+    
+    # エラー種別を判定
+    kind = "validation_error"
+    kind_label = "検証エラー"
+    rule = "unknown"
+    err_text = "\n".join(errors) if errors else ""
+    if "プレースホルダー" in err_text or "タグ" in err_text:
+        kind = "token_mismatch"
+        kind_label = "トークン不一致"
+        rule = "placeholders_must_match"
+    elif "KEEP" in err_text:
+        kind = "keep_term_missing"
+        kind_label = "KEEP用語欠落"
+        rule = "keep_terms_required"
+    elif "FORCE" in err_text:
+        kind = "force_term_missing"
+        kind_label = "FORCE用語欠落"
+        rule = "force_terms_preferred"
+    
+    # 親ログ: 動的なkind表示
+    print(f"::warning::{kind}({kind_label}) key={key}", flush=True)
+    print(f"::group::detail key={key}", flush=True)
+    print(f"  kind: {kind}", flush=True)
+    print(f"  rule: {rule}", flush=True)
+    print("", flush=True)
+    
+    if context:
+        orig_tokens = context.get('orig_tokens') or []
+        tran_tokens = context.get('tran_tokens') or []
+        
+        # トークン表示（カウント付き）
+        print(f"  tokens:", flush=True)
+        print(f"    orig: {orig_tokens} ({len(orig_tokens)})", flush=True)
+        print(f"    tran: {tran_tokens} ({len(tran_tokens)})", flush=True)
+        print("", flush=True)
+        
+        # diff: Counter で多重集合の差分を計算
+        oc = Counter(orig_tokens)
+        tc = Counter(tran_tokens)
+        missing = list((oc - tc).elements())
+        extra = list((tc - oc).elements())
+        
+        if missing or extra:
+            print(f"  diff:", flush=True)
+            if missing:
+                print(f"    missing: {missing}", flush=True)
+            if extra:
+                print(f"    extra: {extra}", flush=True)
+            print("", flush=True)
+        
+        # テキスト表示（json.dumpsでエスケープ）
+        orig_text = context.get('orig_text') or ''
+        tran_text = context.get('tran_text') or ''
+        if orig_text or tran_text:
+            orig_preview = orig_text[:80] + "..." if len(orig_text) > 80 else orig_text
+            tran_preview = tran_text[:80] + "..." if len(tran_text) > 80 else tran_text
+            print(f"  text:", flush=True)
+            print(f"    orig: {json.dumps(orig_preview, ensure_ascii=False)}", flush=True)
+            print(f"    tran: {json.dumps(tran_preview, ensure_ascii=False)}", flush=True)
+            print("", flush=True)
+    
+    # エラー詳細
+    if errors:
+        print("", flush=True)
+        print(f"  errors:", flush=True)
+        for e in errors[:3]:
+            print(f"    - {e}", flush=True)
+    
+    print("::endgroup::", flush=True)
+
+
+
 
 def log_progress(current: int, total: int, filename: str, count: int):
     """進捗"""
@@ -422,17 +486,19 @@ def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any]
 # トークンパターン
 TOKEN_PATTERN = re.compile(r"""
 (
-    %[^%\s]+%                     | # %aura_mana_regen% など（%で囲まれた変数）
-    %\$(?:str|agi|int)\b          | # %$str など（ボーナス系で出る）
-    \$(?:str|agi|int)\b           | # $str など（万一%が無い場合も保護）
-    %%                            | # 100%% の %%（printf系）
-    %[sdif]\d*                    | # %d, %s1, %f など
-    %[sdif][A-Za-z0-9_]+%+        | # %fMODIFIER_PROPERTY_...%%% など（末尾%複数OK）
-    \{[gs]:[^}]+\}                | # {g:xxx} {s:xxx}
+    %%                            | # リテラル%（100%%など）
+    %[sdif]\d+                    | # %s1, %d2 など（番号付きprintf）
+    %[sdif](?![a-zA-Z0-9_])       | # %d, %s, %f など（単体printf、後ろに英数字が続かない）
+    %[A-Za-z_][A-Za-z0-9_]*%      | # %variable_name%（英字/_開始の変数）
+    %\$(?:str|agi|int)\b          | # %$str など（ステータスボーナス）
+    \$(?:str|agi|int)\b           | # $str など（%なしバージョン）
+    \{[gsd]:[^}]+\}               | # {g:xxx} {s:xxx} {d:xxx}（テンプレート変数）
     <[^>]+>                       | # HTMLタグ
-    \\n|\n                        # エスケープ改行と実改行
+    \\n                            # エスケープ改行
 )
 """, re.VERBOSE)
+
+
 
 def debug_token_diff(original: str, translated: str):
     """トークン抽出結果の差異をデバッグログに出力します。"""
@@ -441,13 +507,23 @@ def debug_token_diff(original: str, translated: str):
     if o != t:
         logger.warning(f"TOKEN DIFF\nORIG: {o}\nTRAN: {t}")
 
-def validate_translation(original: str, translated: str, term_check_list: List[Dict[str, str]], strict_force: bool = False) -> Tuple[bool, List[str]]:
-    """ルールに基づいて翻訳を検証します。"""
+def validate_translation(original: str, translated: str, term_check_list: List[Dict[str, str]], strict_force: bool = False) -> Tuple[bool, List[str], Dict[str, Any]]:
+    """ルールに基づいて翻訳を検証します。
+    
+    Returns:
+        Tuple[bool, List[str], Dict[str, Any]]: (有効か, エラーリスト, トークン情報)
+    """
     errors = []
+    token_info = {}
     
     # 1. プレースホルダーとタグ (FAIL レベル - 常に厳格)
     orig_matches = TOKEN_PATTERN.findall(original)
     trans_matches = TOKEN_PATTERN.findall(translated)
+    
+    token_info['orig_tokens'] = orig_matches
+    token_info['tran_tokens'] = trans_matches
+    token_info['orig_text'] = original
+    token_info['tran_text'] = translated
     
     # 順序も含めて完全一致する必要がある
     if orig_matches != trans_matches:
@@ -473,7 +549,7 @@ def validate_translation(original: str, translated: str, term_check_list: List[D
                     # 警告のみ
                     logger.warning(msg)
     
-    return len(errors) == 0, errors
+    return len(errors) == 0, errors, token_info
 
 def translate_batch(batch: Dict[str, str], glossary: List[Dict[str, str]], ai_rules: str, strict_force: bool = False) -> Dict[str, str]:
     """Gemini APIを使用してバッチ翻訳を実行します。"""
@@ -530,12 +606,18 @@ Input:
             for key, translated_text in translated_data.items():
                 original_text = batch.get(key, "")
                 key_terms = extract_relevant_glossary_terms(original_text, glossary)
-                is_valid, errors = validate_translation(original_text, translated_text, key_terms, strict_force)
+                is_valid, errors, token_info = validate_translation(original_text, translated_text, key_terms, strict_force)
                 
                 if is_valid:
                     validated_data[key] = translated_text
                 else:
-                    log_warning_group(key, errors)
+                    context = {
+                        'orig_tokens': token_info.get('orig_tokens', []),
+                        'tran_tokens': token_info.get('tran_tokens', []),
+                        'orig_text': token_info.get('orig_text', ''),
+                        'tran_text': token_info.get('tran_text', '')
+                    }
+                    log_warning_group(key, errors, context)
             
             return validated_data
 
@@ -563,8 +645,6 @@ def parse_arguments():
                         help='未処理キーがある場合に終了コード1で終了します。')
     parser.add_argument('--strict-force', action='store_true',
                         help='FORCE用語の制約違反（警告レベル）をエラーとして扱います。')
-    parser.add_argument('--dry-run', action='store_true',
-                        help='API呼び出しやファイル保存を行わずに実行します。')
     
     # ターゲットファイル・行範囲指定
     parser.add_argument('--target-file', type=str, default=None,
@@ -593,7 +673,6 @@ def main():
         print(f"基準コミット: {args.base_commit}", flush=True)
     if args.mode == 'range' or args.target_file:
         print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})", flush=True)
-    print(f"ドライラン: {args.dry_run}", flush=True)
     log_separator()
     
     # APIキーチェック
@@ -727,12 +806,6 @@ def main():
             batch_keys = keys_to_process[i:i+batch_size]
             batch_dict = {k: to_translate_map[k] for k in batch_keys}
             
-            if args.dry_run:
-                logger.info(f"[ドライラン] バッチ翻訳対象 {len(batch_dict)} 件: {list(batch_dict.keys())[:3]}...")
-                for k in batch_dict:
-                    jp_tokens_ref[k] = "[DRY_RUN] " + batch_dict[k]
-                continue
-            
             batch_num = i // BATCH_SIZE + 1
             total_batches = (len(keys_to_process) + BATCH_SIZE - 1) // BATCH_SIZE
             log_progress(batch_num, total_batches, os.path.basename(file_path), len(batch_dict))
@@ -751,8 +824,7 @@ def main():
 
         files_processed += 1
 
-        if not args.dry_run:
-            save_json_file(jp_file_path, jp_data)
+        save_json_file(jp_file_path, jp_data)
 
     if unprocessed_keys_report:
         logger.warning(f"未処理キー数: {len(unprocessed_keys_report)}")

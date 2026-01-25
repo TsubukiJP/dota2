@@ -721,6 +721,7 @@ def main():
     total_batch_count = 0
     total_violation_count = 0
     files_processed = 0
+    translated_files_list = []
     unprocessed_keys_report = {} # Key: {file_path, error}
 
     for file_path in target_files:
@@ -823,6 +824,7 @@ def main():
                      total_violation_count += 1
 
         files_processed += 1
+        translated_files_list.append(os.path.basename(file_path))
 
         save_json_file(jp_file_path, jp_data)
 
@@ -868,7 +870,7 @@ def main():
         "translation_count": total_processed_count,
         "violation_count": total_violation_count,
         "elapsed_time": f"{elapsed_min}分{elapsed_sec}秒",
-        "translated_files": [os.path.basename(f) for f in target_files if os.path.exists(f.replace("_english", "_japanese"))]
+        "translated_files": translated_files_list
     }
     
     try:

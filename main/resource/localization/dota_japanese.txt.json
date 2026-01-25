@@ -17284,5 +17284,9 @@
     "DOTA_Chat_MinibossKilledGood": "Radiantがトーメンターを倒した!",
     "DOTA_Chat_MinibossKilledBad": "Direがトーメンターを倒した!",
     "DOTA_Roshan_Bottom": "ボトム",
-    "DOTA_Roshan_Top": "トップ"
+    "DOTA_Roshan_Top": "トップ",
+    "DOTA_TrophyCategory_MonsterHunter": "Monster Hunter",
+    "DOTA_TrophyUnits_EntriesUnlocked:p": "%s1 項目解放済み#|#%s1 項目解放済み",
+    "DOTA_TrophyName_MonsterHunter_HeroAtlas": "Monster Hunter ヒーローアトラス",
+    "DOTA_TrophyDesc_MonsterHunter_HeroAtlas": "Monster Hunterコラボイベント期間中のヒーローアトラス全体の達成状況。"
 }

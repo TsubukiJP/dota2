@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Translation Mode'
+        description: '翻訳モード (diff=差分, missing=未翻訳, changed=変更, range=行範囲指定)'
         required: true
         default: 'diff'
         type: choice
@@ -15,23 +15,23 @@ on:
           - changed
           - missing+changed
       base_commit:
-        description: 'Base commit for diff mode (e.g., HEAD~1, abc123^)'
+        description: 'diffモードの基準コミット (例: HEAD~1, abc123^)'
         required: false
         default: 'HEAD~1'
       max_items:
-        description: 'Max items to translate (0 = unlimited)'
+        description: '最大翻訳件数 (0 = 無制限)'
         required: false
         default: '0'
       target_file:
-        description: 'Target file (required for range mode, e.g., dota_english.txt.json)'
+        description: '対象ファイル (rangeモードは必須、他モードは任意。例: abilities_english.txt.json)'
         required: false
         default: ''
       from_line:
-        description: 'Start line (for target_file)'
+        description: '開始行 (対象ファイル指定時)'
         required: false
         default: '1'
       to_line:
-        description: 'End line (for target_file, empty = EOF)'
+        description: '終了行 (対象ファイル指定時、空欄=EOF)'
         required: false
         default: ''
   workflow_run:
@@ -47,9 +47,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  translate:
+  # Fetchによる更新があったかを確認するジョブ
+  check:
+    name: Check for fetch updates
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      should_translate: ${{ steps.check.outputs.should_translate }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Check if fetch had changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_translate=true" >> $GITHUB_OUTPUT
+            echo "✅ 手動実行: 翻訳を実行します"
+          else
+            COMMIT_MSG=$(git log -1 --pretty=%s)
+            echo "最新コミット: $COMMIT_MSG"
+            if [[ "$COMMIT_MSG" == Client\ version:* ]]; then
+              echo "should_translate=true" >> $GITHUB_OUTPUT
+              echo "✅ Fetchによる更新を検出: 翻訳を実行します"
+            else
+              echo "should_translate=false" >> $GITHUB_OUTPUT
+              echo "⏭️ Fetchによる更新なし: 翻訳をスキップします"
+            fi
+          fi
+
+  # 翻訳ジョブ
+  translate:
+    name: Translate
+    runs-on: ubuntu-latest
+    needs: check
+    if: ${{ needs.check.outputs.should_translate == 'true' }}
 
     steps:
       - name: Checkout code

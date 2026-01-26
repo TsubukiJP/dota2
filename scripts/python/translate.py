@@ -426,17 +426,12 @@ def get_diff_keys(base_commit: str = "HEAD~1") -> Dict[str, set]:
         return {}
 
 
-def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any], filepath: str, mode: str, min_change_ratio: float = 0.0, diff_keys: set = None) -> Dict[str, str]:
+def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any], filepath: str, mode: str, diff_keys: set = None, force: bool = False) -> Dict[str, str]:
     """翻訳が必要なキーを特定します。"""
     to_translate = {}
     
     eng_tokens = get_keys_from_json(english_data)
     jp_tokens = get_keys_from_json(japanese_data)
-    
-    old_eng_tokens = {}
-    if mode in ['changed', 'missing+changed']:
-        old_eng_data = get_old_file_content(filepath)
-        old_eng_tokens = get_keys_from_json(old_eng_data)
 
     for key, eng_text in eng_tokens.items():
         if not isinstance(eng_text, str): continue
@@ -445,38 +440,17 @@ def identify_changes(english_data: Dict[str, Any], japanese_data: Dict[str, Any]
         needs_translation = False
         jp_text = jp_tokens.get(key)
         
-        # 0. diffモード: 差分キーのみを対象
+        # diffモード: 差分キーのみを対象
         if mode == 'diff':
             if diff_keys and key in diff_keys:
                 needs_translation = True
         
-        # 0.5. rangeモード: 行範囲フィルタは後段で適用、全キー対象（missing扱い）
-        elif mode == 'range':
-            if not jp_text:
+        # targetモード: 未翻訳のみ（forceなら全て）
+        elif mode == 'target':
+            if force:
                 needs_translation = True
-        
-        # 1. 新規チェック
-        elif mode in ['missing', 'missing+changed']:
-             if not jp_text: 
+            elif not jp_text:
                 needs_translation = True
-             
-             # 2. 変更チェック（missing+changedの場合）
-             if not needs_translation and mode == 'missing+changed':
-                if key in old_eng_tokens:
-                    old_text = old_eng_tokens[key]
-                    if old_text != eng_text:
-                        needs_translation = True
-                elif key not in old_eng_tokens:
-                     needs_translation = True
-        
-        # 3. changedのみ
-        elif mode == 'changed':
-            if key in old_eng_tokens:
-                old_text = old_eng_tokens[key]
-                if old_text != eng_text:
-                    needs_translation = True
-            elif key not in old_eng_tokens:
-                 needs_translation = True
         
         if needs_translation:
             to_translate[key] = eng_text
@@ -631,24 +605,24 @@ def parse_arguments():
     """コマンドライン引数を解析します。"""
     parser = argparse.ArgumentParser(description='Gemini APIを使用したDota 2自動翻訳スクリプト')
     
-    parser.add_argument('--mode', choices=['missing', 'changed', 'missing+changed', 'diff', 'range'], default='missing+changed',
-                        help='翻訳モード: missing, changed, missing+changed, diff (コミット差分), range (ファイル+行範囲)。')
+    parser.add_argument('--mode', choices=['diff', 'target'], default='diff',
+                        help='翻訳モード: diff (コミット差分), target (ファイル・範囲指定)。')
     parser.add_argument('--base-commit', type=str, default='HEAD~1',
                         help='diffモードで比較するベースコミット (デフォルト: HEAD~1)。')
     parser.add_argument('--max-items', type=int, default=0,
                         help='翻訳する最大キー数（0は無制限）。')
     parser.add_argument('--priority', type=str, nargs='+',
                         help='優先的に翻訳するカテゴリ（例: Lore Description）。キー名に含まれる文字列で判定します。')
-    parser.add_argument('--min-change-ratio', type=float, default=0.0,
-                        help='最小変更率（0.0〜1.0）。')
     parser.add_argument('--strict-unprocessed', action='store_true',
                         help='未処理キーがある場合に終了コード1で終了します。')
     parser.add_argument('--strict-force', action='store_true',
                         help='FORCE用語の制約違反（警告レベル）をエラーとして扱います。')
+    parser.add_argument('--force', action='store_true',
+                        help='targetモードで既存の翻訳も含めて再翻訳します。')
     
     # ターゲットファイル・行範囲指定
     parser.add_argument('--target-file', type=str, default=None,
-                        help='翻訳対象のファイル名 (例: dota_english.txt.json)。指定時はこのファイルのみ処理。')
+                        help='翻訳対象のファイル名 (例: dota_english.txt.json)。targetモードでは必須。')
     parser.add_argument('--from-line', type=int, default=1,
                         help='--target-file指定時の開始行番号 (デフォルト: 1)。')
     parser.add_argument('--to-line', type=int, default=None,
@@ -660,9 +634,9 @@ def main():
     start_time = time.time()
     args = parse_arguments()
     
-    # range モードのバリデーション
-    if args.mode == 'range' and not args.target_file:
-        logger.error("エラー: --mode range には --target-file が必須です。")
+    # target モードのバリデーション
+    if args.mode == 'target' and not args.target_file:
+        logger.error("エラー: --mode target には --target-file が必須です。")
         sys.exit(1)
     
     # 開始バナー
@@ -671,13 +645,15 @@ def main():
     print(f"モード: {args.mode}", flush=True)
     if args.mode == 'diff':
         print(f"基準コミット: {args.base_commit}", flush=True)
-    if args.mode == 'range' or args.target_file:
+    if args.mode == 'target':
         print(f"対象ファイル: {args.target_file} (行: {args.from_line}-{args.to_line or 'EOF'})", flush=True)
+        if args.force:
+            print(f"強制再翻訳: 有効", flush=True)
     log_separator()
     
     # APIキーチェック
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-    if not GEMINI_API_KEY and not args.dry_run:
+    if not GEMINI_API_KEY:
         logger.error("重大エラー: GEMINI_API_KEY が設定されていません。終了します。")
         sys.exit(1)
     
@@ -747,7 +723,7 @@ def main():
                 logger.info(f"差分キーがありません: {basename}")
                 continue
         
-        to_translate_map = identify_changes(eng_data, jp_data, file_path, args.mode, args.min_change_ratio, file_diff_keys)
+        to_translate_map = identify_changes(eng_data, jp_data, file_path, args.mode, file_diff_keys, args.force)
         
         # 行範囲フィルタが有効な場合、キーをフィルタリング
         if line_range_keys is not None:

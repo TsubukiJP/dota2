@@ -4,16 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '翻訳モード (diff=差分, missing=未翻訳, changed=変更, range=行範囲指定)'
+        description: '翻訳モード (diff=差分翻訳, target=ファイル・範囲指定)'
         required: true
         default: 'diff'
         type: choice
         options:
           - diff
-          - range
-          - missing
-          - changed
-          - missing+changed
+          - target
       base_commit:
         description: 'diffモードの基準コミット (例: HEAD~1, abc123^)'
         required: false
@@ -23,17 +20,22 @@ on:
         required: false
         default: '0'
       target_file:
-        description: '対象ファイル (rangeモードは必須、他モードは任意。例: abilities_english.txt.json)'
+        description: '対象ファイル (targetモード：必須、例: abilities_english.txt.json)'
         required: false
         default: ''
       from_line:
-        description: '開始行 (対象ファイル指定時)'
+        description: '開始行 (targetモード：任意)'
         required: false
         default: '1'
       to_line:
-        description: '終了行 (対象ファイル指定時、空欄=EOF)'
+        description: '終了行 (targetモード：空欄=EOF)'
         required: false
         default: ''
+      force:
+        description: '既存翻訳も再翻訳する (targetモード)'
+        required: false
+        default: false
+        type: boolean
   workflow_run:
     workflows: ["Fetch localization data with SteamCMD"]
     types: [completed]
@@ -123,7 +125,7 @@ jobs:
             ARGS="$ARGS --max-items $MAX_ITEMS"
           fi
           
-          # Target file with line range
+          # Target file with line range (for target mode)
           TARGET_FILE="${{ github.event.inputs.target_file }}"
           if [ -n "$TARGET_FILE" ]; then
             ARGS="$ARGS --target-file $TARGET_FILE"
@@ -133,6 +135,12 @@ jobs:
             if [ -n "$TO_LINE" ]; then
               ARGS="$ARGS --to-line $TO_LINE"
             fi
+          fi
+          
+          # Force option (for target mode)
+          FORCE="${{ github.event.inputs.force }}"
+          if [ "$FORCE" == "true" ]; then
+            ARGS="$ARGS --force"
           fi
           
           echo "Running: python scripts/python/translate.py $ARGS"

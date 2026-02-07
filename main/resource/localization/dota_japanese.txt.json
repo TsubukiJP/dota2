@@ -17284,5 +17284,7 @@
     "DOTA_Chat_MinibossKilledGood": "Radiantがトーメンターを倒した!",
     "DOTA_Chat_MinibossKilledBad": "Direがトーメンターを倒した!",
     "DOTA_Roshan_Bottom": "ボトム",
-    "DOTA_Roshan_Top": "トップ"
+    "DOTA_Roshan_Top": "トップ",
+    "DOTA_MonsterHunter_Event_Ended": "イベントは終了しました",
+    "DOTA_MonsterHunter_Event_Autocraft": "残りの素材は、未受領のアイテムの作成に自動的に使用されます。"
 }

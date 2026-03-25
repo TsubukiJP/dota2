@@ -2432,7 +2432,7 @@
     "DOTA_Tooltip_ability_rattletrap_hookshot_Note0": "Hookshotは味方にもヒットし、Clockwerkを味方まで移動させるが、ダメージやスタンは与えない。",
     "DOTA_Tooltip_ability_rattletrap_hookshot_duration": "スタン時間:",
     "DOTA_Tooltip_ability_rattletrap_hookshot_damage": "ダメージ:",
-    "DOTA_Tooltip_ability_rattletrap_overclocking_Description": "Battery Assaultが範囲内の全ての敵に当たり、Power Cogs内で攻撃速度が増加し、Rocket Flareのクールダウンが減少し、対象の左右に追加弾を発射するようになる。また、Hookshotのスタン範囲と効果時間が増加し、Jetpack効果時の移動速度が増加する。効果時間終了時、自身は移動速度と攻撃速度のスローを一気に受ける。",
+    "DOTA_Tooltip_ability_rattletrap_overclocking_Description": "Clockwerkのアビリティを超強化する。<br><br><b>Battery Assault</b>: 範囲が増加し、射程内の全敵ユニットに影響を与える。<br><b>Power Cogs</b>: 範囲が増加し、Power Cogsの近くにいる間のClockwerkのアーマーが増加する。<br><b>Rocket Flares</b>: ダメージ、視界、スロー効果時間が増加し、ターゲットの両側にロケットを追加で発射する。<br><b>Hookshot</b>: スタン範囲と効果時間が増加する。<br><b>Jetpack</b>: 移動速度が速くなる。<br><br>効果時間終了後、Clockwerkの移動速度と攻撃速度が極端に低下する。",
     "DOTA_Tooltip_ability_rattletrap_overclocking_buff_duration": "効果時間:",
     "DOTA_Tooltip_ability_rattletrap_overclocking_bonus_attack_speed": "コグ内ボーナス攻撃速度:",
     "DOTA_Tooltip_ability_rattletrap_overclocking_debuff_duration": "自身のスロー効果時間:",
@@ -13643,5 +13643,8 @@
     "DOTA_Tooltip_ability_brewmaster_earth_spell_immunity_slow_resist": "%スロー耐性:",
     "DOTA_Tooltip_ability_kez_falcon_rush_Note0": "建造物には影響しない。",
     "DOTA_Tooltip_ability_largo_croak_of_genius_Note1": "発動者と対象の距離が%max_distance%以内にいる必要がある。",
-    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。"
+    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。",
+    "DOTA_Tooltip_ability_alchemist_goblins_greed_bonus_gold_tooltip": "基本ボーナスゴールド:",
+    "DOTA_Tooltip_ability_alchemist_goblins_greed_bonus_gold_cap_tooltip": "キルごとの最大ボーナスゴールド:",
+    "DOTA_Tooltip_Ability_winter_wyvern_eldwurms_edda_Description": "Winter Wyvernにアイテム「Eldwurm's Edda」を付与する。このアイテムは消費することで、基本アビリティの現在および最大レベルを1増加させ、Winter Wyvernの基本Intelligenceを消費時の現在値の%tooltip_int_pct%%%分増加させる。"
 }

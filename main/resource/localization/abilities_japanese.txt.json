@@ -6571,7 +6571,7 @@
     "DOTA_Tooltip_ability_undying_decay_scepter_Description": "Strength奪取量が増加する。",
     "DOTA_Tooltip_modifier_visage_silent_as_the_grave": "Silent as the Grave",
     "DOTA_Tooltip_modifier_visage_silent_as_the_grave_Description": "透明化し、移動速度が増加し、飛行している。",
-    "DOTA_Tooltip_ability_rubick_spell_steal_scepter_description": "盗んで保持できるスペルの数が2に増加する。射程が増加し、セプター所持時の効果があればそれが適用される。",
+    "DOTA_Tooltip_ability_rubick_spell_steal_scepter_description": "盗めるスペルの数を2に増加させ、キャスト範囲を増加させる。盗んだスペルはセプター版にアップグレードされる。",
     "DOTA_Tooltip_modifier_keeper_of_the_light_radiant_bind": "Solar Bind",
     "DOTA_Tooltip_modifier_keeper_of_the_light_radiant_bind_Description": "移動速度が %dMODIFIER_PROPERTY_MOVESPEED_BONUS_PERCENTAGE%%%、魔法耐性が %dMODIFIER_PROPERTY_MAGICAL_RESISTANCE_BONUS%%%減少している。",
     "DOTA_Tooltip_ability_wisp_tether_shard_description": "Tetherに触れている敵にダメージを与える。Ioは与えたダメージの%damage_to_heal%%%を回復する。",
@@ -13638,5 +13638,6 @@
     "DOTA_Tooltip_ability_brewmaster_earth_spell_immunity_slow_resist": "%スロー耐性:",
     "DOTA_Tooltip_ability_kez_falcon_rush_Note0": "建造物には影響しない。",
     "DOTA_Tooltip_ability_largo_croak_of_genius_Note1": "発動者と対象の距離が%max_distance%以内にいる必要がある。",
-    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。"
+    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。",
+    "DOTA_Tooltip_ability_rubick_spell_steal_shard_description": "盗んだスペルをそのシャード版にアップグレードする。"
 }

@@ -6458,7 +6458,7 @@
     "DOTA_Tooltip_ability_item_aether_lens_Note0": "キャスト範囲ボーナスはAether Lensやその派生アイテムとスタックしない。",
     "DOTA_Tooltip_ability_item_cyclone_Note0": "味方には使用できない。",
     "DOTA_Tooltip_ability_item_cyclone_Note2": "Cycloneはいくつかのバフやデバフをディスペルする。",
-    "DOTA_Tooltip_ability_item_wind_waker_Description": "<h1>アクティブ: Cyclone</h1> 指定したユニットを竜巻で打ち上げ、%cyclone_duration%秒間無敵にする。このCycloneは自分自身、敵、もしくは味方にキャストできる。<br><br>敵ユニットは着地した時に%tooltip_drop_damage%魔法ダメージを受ける。<br>ディスペルタイプ: <span class=\"GameplayValues GameplayVariable\">基本ディスペル</span>",
+    "DOTA_Tooltip_ability_item_wind_waker_Description": "<h1>アクティブ: サイクロン</h1> 選択したユニットをサイクロンで巻き上げ、%cyclone_duration%秒間無敵にする。サイクロンは自身、敵ユニット、または味方ユニットに発動できる。自身に発動した場合、竜巻を%tornado_speed%の速度で移動できる。<br><br>敵ユニットは着地時に%tooltip_drop_damage%魔法ダメージを負う。<br>ディスペル種別: <span class=\"GameplayValues GameplayVariable\">基本ディスペル</span>",
     "DOTA_Tooltip_ability_item_wind_waker_Note0": "Cycloneはいくつかのバフやデバフをディスペルする。",
     "DOTA_Tooltip_ability_item_wind_waker_Note1": "自身にキャストした場合、移動速度360で自由に移動する事ができる。",
     "DOTA_Tooltip_ability_item_dagon_Description": "<h1>アクティブ: Energy Burst</h1> 指定した敵ユニットに強力な爆裂魔法を放出し魔法ダメージを与え、与えたダメージの%dagon_spell_lifesteal%%%だけ、体力を回復する。アップグレードが可能。<br><br>ダメージ: %damage%<br>マナコスト: %mana_cost_tooltip%",

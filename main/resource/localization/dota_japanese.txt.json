@@ -17195,5 +17195,8 @@
     "DOTA_Chat_MinibossKilledGood": "Radiantがトーメンターを倒した!",
     "DOTA_Chat_MinibossKilledBad": "Direがトーメンターを倒した!",
     "DOTA_Roshan_Bottom": "ボトム",
-    "DOTA_Roshan_Top": "トップ"
+    "DOTA_Roshan_Top": "トップ",
+    "DOTA_Style_Dragon_Knight_Griffin_Knight_0": "炎",
+    "DOTA_Style_Dragon_Knight_Griffin_Knight_1": "腐食",
+    "DOTA_Style_Dragon_Knight_Griffin_Knight_2": "フロスト"
 }

@@ -3401,7 +3401,7 @@
     "DOTA_Tooltip_ability_special_bonus_unique_windranger": "+{s:bonus_radius} Windrun 範囲",
     "DOTA_Tooltip_ability_special_bonus_unique_windranger_2": "Focus Fireキル時クールダウン{s:bonus_cooldown_reduction_per_kill}秒減少",
     "DOTA_Tooltip_ability_special_bonus_unique_windranger_3": "-{s:bonus_damage_reduction}% Powershot減少",
-    "DOTA_Tooltip_ability_special_bonus_unique_windranger_4": "-{s:bonus_AbilityCooldown}秒Windrunクールダウン",
+    "DOTA_Tooltip_ability_special_bonus_unique_windranger_4": "+{s:bonus_AbilityDuration}秒 Windrun 効果時間",
     "DOTA_Tooltip_ability_special_bonus_unique_windranger_5": "Shackleshotの対象数+{s:value}",
     "DOTA_Tooltip_ability_special_bonus_unique_windranger_6": "+{s:bonus_stun_duration}秒Shackleshot時間",
     "DOTA_Tooltip_ability_special_bonus_unique_windranger_7": "Windrun中透明になる",
@@ -13635,5 +13635,6 @@
     "DOTA_Tooltip_ability_brewmaster_earth_spell_immunity_slow_resist": "%スロー耐性:",
     "DOTA_Tooltip_ability_kez_falcon_rush_Note0": "建造物には影響しない。",
     "DOTA_Tooltip_ability_largo_croak_of_genius_Note1": "発動者と対象の距離が%max_distance%以内にいる必要がある。",
-    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。"
+    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。",
+    "DOTA_Tooltip_ability_windrunner_windrun_AbilityDuration": "効果時間:"
 }

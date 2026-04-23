@@ -12075,7 +12075,7 @@
     "DOTA_Tooltip_ability_kez_switch_weapons_scepter_description": "Switch Discipline使用後%scepter_cooldown_timer%秒以内にキャストされた最初のアビリティでは、もう一方の武器アビリティのクールダウンをリフレッシュされない。<br><br>任意の武器アビリティを使用すると、Switch Disciplineのクールダウンがリフレッシュされる。",
     "DOTA_Tooltip_modifier_kez_switch_weapons_aghs": "Switch Discipline",
     "DOTA_Tooltip_ability_kez_echo_slash": "Echo Slash",
-    "DOTA_Tooltip_ability_kez_echo_slash_Description": "Katanaで前方に一直線に斬りつけ、範囲内の対象に攻撃と短いスローを与える。 少しのディレイの後、同範囲は追撃される。 ヒーローはボーナスダメージを受ける。",
+    "DOTA_Tooltip_ability_kez_echo_slash_Description": "Kezは刀で前方%katana_distance%の直線状に斬りつけ、範囲内の敵を攻撃し、短い%tag_slow%%%のスロー効果を付与する。短い遅延の後、その範囲は再度攻撃される。ヒーローはボーナスダメージを受ける。",
     "DOTA_Tooltip_ability_kez_echo_slash_Lore": "Kezと彼の師匠であるKrawは、古くから伝わる技を改良し、Flyerのバランスを崩す新たな方法をKazuraiに伝授するため、弛まぬ努力を続けてきた。",
     "DOTA_Tooltip_ability_kez_echo_slash_echo_hero_damage": "ヒーローボーナスダメージ:",
     "DOTA_Tooltip_ability_kez_echo_slash_katana_echo_damage": "%攻撃ダメージ:",
@@ -13635,5 +13635,6 @@
     "DOTA_Tooltip_ability_brewmaster_earth_spell_immunity_slow_resist": "%スロー耐性:",
     "DOTA_Tooltip_ability_kez_falcon_rush_Note0": "建造物には影響しない。",
     "DOTA_Tooltip_ability_largo_croak_of_genius_Note1": "発動者と対象の距離が%max_distance%以内にいる必要がある。",
-    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。"
+    "DOTA_Tooltip_ability_special_bonus_unique_tidehunter_smash_on_blubber_description": "これで発生するダメージは{s:bonus_smash_on_purge}%で、反射ダメージ扱いとなる。",
+    "DOTA_Tooltip_modifier_item_crellas_crozier_debuff_Description": "体力回復が%dMODIFIER_PROPERTY_TOOLTIP%%%減少している。"
 }

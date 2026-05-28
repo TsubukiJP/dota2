@@ -2431,7 +2431,7 @@
     "DOTA_Tooltip_ability_rattletrap_hookshot_Note0": "Hookshotは味方にもヒットし、Clockwerkを味方まで移動させるが、ダメージやスタンは与えない。",
     "DOTA_Tooltip_ability_rattletrap_hookshot_duration": "スタン時間:",
     "DOTA_Tooltip_ability_rattletrap_hookshot_damage": "ダメージ:",
-    "DOTA_Tooltip_ability_rattletrap_overclocking_Description": "Battery Assaultが範囲内の全ての敵に当たり、Power Cogs内で攻撃速度が増加し、Rocket Flareのクールダウンが減少し、対象の左右に追加弾を発射するようになる。また、Hookshotのスタン範囲と効果時間が増加し、Jetpack効果時の移動速度が増加する。効果時間終了時、自身は移動速度と攻撃速度のスローを一気に受ける。",
+    "DOTA_Tooltip_ability_rattletrap_overclocking_Description": "Clockwerkのアビリティを大幅に強化する。<br><br><b>Battery Assault</b>: 範囲が増加し、その範囲内のすべての敵に影響を与える。<br><b>Power Cogs</b>: 範囲が増加し、Power Cogs近接時のClockwerkのアーマーが増加する。<br><b>Rocket Flares</b>: ダメージ、視界、スロー効果時間が増加し、ターゲットの両側に追加のロケットを発射する。<br><b>Hookshot</b>: スタン範囲と効果時間が増加する。<br><b>Jetpack</b>: 移動速度が増加する。<br><br>効果時間終了後、Clockwerkの移動速度と攻撃速度が大幅に低下する。",
     "DOTA_Tooltip_ability_rattletrap_overclocking_buff_duration": "効果時間:",
     "DOTA_Tooltip_ability_rattletrap_overclocking_bonus_attack_speed": "コグ内ボーナス攻撃速度:",
     "DOTA_Tooltip_ability_rattletrap_overclocking_debuff_duration": "自身のスロー効果時間:",

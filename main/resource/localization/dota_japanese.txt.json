@@ -17029,5 +17029,7 @@
     "DOTA_Chat_MinibossKilledGood": "Radiantがトーメンターを倒した!",
     "DOTA_Chat_MinibossKilledBad": "Direがトーメンターを倒した!",
     "DOTA_Roshan_Bottom": "ボトム",
-    "DOTA_Roshan_Top": "トップ"
+    "DOTA_Roshan_Top": "トップ",
+    "KillEaterEventType_Muerta_DeadShotsIntoTheCalling": "The Calling発動中のDead Shots",
+    "KillEaterEventType_Slardar_BashDamage": "Slardar バッシュダメージ"
 }

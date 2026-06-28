@@ -3,6 +3,8 @@ import json
 import glob
 
 for fnj in glob.glob('**/*_japanese.txt.json', recursive=True):
+    if 'official' in fnj.replace('\\', '/'):
+        continue
     fne = fnj.replace('_japanese.txt.json', '_english.txt.json')
     with open(fnj, 'r', encoding='utf-8') as fj, open(fne, 'r', encoding='utf-8') as fe:
         jdata = json.load(fj, object_pairs_hook=OrderedDict)

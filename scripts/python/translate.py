@@ -674,6 +674,90 @@ Input:
     return {}
 
 
+def extract_dynamic_terminology(
+    all_values: List[str],
+    glossary: List[Dict[str, str]],
+    ai_rules: str
+) -> List[Dict[str, str]]:
+    """Phase 1: 翻訳前に全テキストを一括分析し、固有名詞の訳語を動的に確定する。
+
+    既存 glossary に存在する用語は除外し、新規に登場する用語のみを抽出する。
+    失敗時は空リストを返してフォールバックする。
+    """
+    if not all_values:
+        return []
+
+    glossary_text = "\n".join(
+        f"{item['原文']} -> {item['訳語']} ({item['制約']})"
+        for item in glossary
+    )
+
+    unique_values = list(dict.fromkeys(v for v in all_values if v.strip()))
+    combined_text = "\n".join(unique_values)
+
+    system_instruction = f"""You are a professional Dota 2 translator.
+
+{ai_rules}
+
+## Existing Glossary (already decided — do NOT re-include these terms)
+{glossary_text}
+"""
+
+    prompt = f"""Before translating, analyze the following texts and identify proper nouns, character names, item names, and event-specific terminology that need consistent Japanese translations.
+
+Rules:
+- Do NOT include terms already in the glossary above
+- Terms that must stay in English: output the English term as both key and value
+- Focus on terms appearing in multiple texts that risk inconsistent translation
+- Ignore template variables like {{d:var}}, {{s:var}}, %s, HTML tags
+
+Texts to analyze:
+{combined_text}
+
+Return ONLY a JSON object: {{"English term": "Japanese translation"}}
+"""
+
+    model = genai.GenerativeModel(MODEL_NAME, system_instruction=system_instruction)
+
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json"
+            ),
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
+
+        result = safe_json_loads(response.text.strip())
+
+        # 既存glossaryと重複する用語は除外
+        existing_sources = {entry['原文'].lower() for entry in glossary}
+        dynamic_entries = []
+        for eng, jpn in result.items():
+            if not eng or not jpn:
+                continue
+            if eng.lower() in existing_sources:
+                continue
+            dynamic_entries.append({
+                '原文': eng,
+                '訳語': jpn,
+                '制約': 'FORCE',
+                'カテゴリ': 'dynamic',
+                '注記': 'Phase 1 auto-detected'
+            })
+
+        return dynamic_entries
+
+    except Exception as e:
+        logger.warning(f"Phase 1 (用語確定) 失敗: {e}。通常翻訳を継続します。")
+        return []
+
+
 def translate_batch(batch: Dict[str, str], glossary: List[Dict[str, str]], ai_rules: str, strict_force: bool = False) -> Dict[str, str]:
     """Gemini APIを使用してバッチ翻訳を実行します。:fキーのICU複数形前処理を含む。"""
     if not batch:
@@ -874,9 +958,30 @@ def main():
         if not keys_to_process:
             logger.info("このファイルには翻訳対象がありません。")
             continue
-            
+
         total_processed_count += len(keys_to_process)
-        
+
+        # Phase 1: 動的用語確定パス（全テキストを一括分析して固有名詞を確定）
+        effective_glossary = glossary
+        if len(keys_to_process) > 1:
+            logger.info(f"Phase 1: {len(keys_to_process)} 件のテキストを分析し用語を確定中...")
+            dynamic_terms = extract_dynamic_terminology(
+                [to_translate_map[k] for k in keys_to_process],
+                glossary,
+                ai_rules
+            )
+            if dynamic_terms:
+                for t in dynamic_terms:
+                    logger.info(f"  動的用語確定: {t['原文']} -> {t['訳語']}")
+                effective_glossary = sorted(
+                    glossary + dynamic_terms,
+                    key=lambda x: len(x['原文']),
+                    reverse=True
+                )
+                logger.info(f"Phase 1 完了: {len(dynamic_terms)} 件の用語を追加")
+            else:
+                logger.info("Phase 1 完了: 新規用語なし")
+
         batch_size = 20
         jp_tokens_ref = None
         
@@ -909,8 +1014,7 @@ def main():
             log_progress(batch_num, total_batches, os.path.basename(file_path), len(batch_dict))
             total_batch_count += 1
             
-            # ここで --strict-force を渡す
-            translated_batch = translate_batch(batch_dict, glossary, ai_rules, args.strict_force)
+            translated_batch = translate_batch(batch_dict, effective_glossary, ai_rules, args.strict_force)
             
             for k, text in translated_batch.items():
                 jp_tokens_ref[k] = text

@@ -73,6 +73,8 @@ def main():
 
     os.makedirs('localization', exist_ok=True)
 
+    os.makedirs('main/resource/localization/official', exist_ok=True)
+
     with vpk.open(os.path.join(DOTA2_CLIENT, 'game/dota/pak01_dir.vpk')) as pak01:
         for rule in l10ns:
             with pak01.get_file(rule.get_pak_path('english')) as input:
@@ -82,6 +84,20 @@ def main():
                 with open(out_name, 'w', encoding='utf-8') as out:
                     json.dump(data, out, indent=4, ensure_ascii=False)
                     print(f'Wrote "{out_name}" done!!')
+
+        # 公式日本語訳を参照用に抽出
+        for rule in l10ns:
+            try:
+                with pak01.get_file(rule.get_pak_path('japanese')) as input:
+                    raw = input.read()
+                    text = raw.decode('utf-8-sig') if raw[:3] == b'\xef\xbb\xbf' else raw.decode('utf-8')
+                    data = rule.pull(vdf.loads(text))
+                    out_name = f'main/resource/localization/official/{rule.name}_japanese.txt.json'
+                    with open(out_name, 'w', encoding='utf-8') as out:
+                        json.dump(data, out, indent=4, ensure_ascii=False)
+                    print(f'Wrote "{out_name}" done!!')
+            except KeyError:
+                print(f'Official Japanese not found in VPK: {rule.name}')
 
     with open('addons.json', 'r') as addons:
         for addon in json.load(addons):

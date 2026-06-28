@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 定数
-MODEL_NAME = 'gemini-3.1-flash-lite'
+MODEL_NAME = 'gemini-2.5-flash'
 BATCH_SIZE = 20
 
 # GitHub Actions 用ログヘルパー

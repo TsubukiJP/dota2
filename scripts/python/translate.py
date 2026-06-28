@@ -525,24 +525,99 @@ def validate_translation(original: str, translated: str, term_check_list: List[D
     
     return len(errors) == 0, errors, token_info
 
-def translate_batch(batch: Dict[str, str], glossary: List[Dict[str, str]], ai_rules: str, strict_force: bool = False) -> Dict[str, str]:
-    """Gemini APIを使用してバッチ翻訳を実行します。"""
-    if not batch: return {}
-    
-    # 1. このバッチに関連する用語を抽出
+def parse_icu_value(value: str) -> Dict[str, Any]:
+    """Valve独自のICU様複数形フォーマットを解析する。
+
+    例: {count, plural, one{{d:count} item} other {{d:count} items}}
+
+    Returns None if not ICU plural format.
+    Returns: {'variable': str, 'categories': dict, 'prefix': str, 'suffix': str}
+    """
+    match = re.search(r'\{(\w+),\s*(plural|gender),\s*', value)
+    if not match:
+        return None
+
+    variable = match.group(1)
+    prefix = value[:match.start()]
+
+    # ICUブロック全体の終端 } を探す（ネスト考慮）
+    start = match.start()
+    depth = 0
+    end = -1
+    for i in range(start, len(value)):
+        if value[i] == '{':
+            depth += 1
+        elif value[i] == '}':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    if end == -1:
+        return None
+
+    suffix = value[end:]
+    inner = value[match.end():end - 1]  # "one{...} other {...}" の部分
+
+    # カテゴリ (one, other, zero など) を解析
+    categories = {}
+    i = 0
+    while i < len(inner):
+        while i < len(inner) and inner[i].isspace():
+            i += 1
+        if i >= len(inner):
+            break
+
+        cat_match = re.match(r'(\w+)\s*\{', inner[i:])
+        if not cat_match:
+            i += 1
+            continue
+
+        cat_name = cat_match.group(1)
+        brace_pos = i + cat_match.end() - 1
+
+        depth = 1
+        j = brace_pos + 1
+        while j < len(inner) and depth > 0:
+            if inner[j] == '{':
+                depth += 1
+            elif inner[j] == '}':
+                depth -= 1
+            j += 1
+
+        categories[cat_name] = inner[brace_pos + 1:j - 1]
+        i = j
+
+    if not categories:
+        return None
+
+    return {'variable': variable, 'categories': categories, 'prefix': prefix, 'suffix': suffix}
+
+
+def reconstruct_icu_value(parsed: Dict[str, Any], translated_categories: Dict[str, str]) -> str:
+    """翻訳されたカテゴリからICU文字列を再構築する。"""
+    cats_str = " ".join(f"{cat}{{{text}}}" for cat, text in translated_categories.items())
+    icu_block = "{" + parsed['variable'] + ", plural, " + cats_str + "}"
+    return parsed['prefix'] + icu_block + parsed['suffix']
+
+
+def _call_gemini_api(batch: Dict[str, str], glossary: List[Dict[str, str]], ai_rules: str, strict_force: bool = False) -> Dict[str, str]:
+    """Gemini APIを呼び出してバッチ翻訳を実行する（内部関数）。"""
+    if not batch:
+        return {}
+
     batch_text = " ".join(batch.values())
     relevant_terms = extract_relevant_glossary_terms(batch_text, glossary)
     glossary_text = "\n".join([f"{item['原文']} -> {item['訳語']} ({item['制約']})" for item in relevant_terms])
-    
-    # 2. プロンプト作成
+
     system_instruction = f"""You are a professional translator for Dota 2.
-    
+
 {ai_rules}
 
 ## Glossary (Strict priority)
 {glossary_text}
 """
-    
+
     prompt = f"""Translate the following English Dota 2 texts to Japanese.
 Output strictly in JSON format: {{ "key": "translated_text" }}.
 
@@ -552,10 +627,9 @@ Input:
 
     max_retries = 3
     base_delay = 2
-    
-    # モデル設定はmainで実施済みと想定するが、インスタンス化はここで行う
+
     model = genai.GenerativeModel(MODEL_NAME, system_instruction=system_instruction)
-    
+
     for attempt in range(max_retries):
         try:
             response = model.generate_content(
@@ -570,18 +644,16 @@ Input:
                     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                 }
             )
-            
+
             cleaned_text = response.text.strip()
-            # safe_json_loads でパース
             translated_data = safe_json_loads(cleaned_text)
-            
-            # 検証
+
             validated_data = {}
             for key, translated_text in translated_data.items():
                 original_text = batch.get(key, "")
                 key_terms = extract_relevant_glossary_terms(original_text, glossary)
                 is_valid, errors, token_info = validate_translation(original_text, translated_text, key_terms, strict_force)
-                
+
                 if is_valid:
                     validated_data[key] = translated_text
                 else:
@@ -592,14 +664,63 @@ Input:
                         'tran_text': token_info.get('tran_text', '')
                     }
                     log_warning_group(key, errors, context)
-            
+
             return validated_data
 
         except Exception as e:
             logger.error(f"API呼び出し失敗 (試行 {attempt+1}/{max_retries}): {e}")
             time.sleep(base_delay * (2 ** attempt) + random.uniform(0, 1))
-    
-    return {} # リトライ後も失敗
+
+    return {}
+
+
+def translate_batch(batch: Dict[str, str], glossary: List[Dict[str, str]], ai_rules: str, strict_force: bool = False) -> Dict[str, str]:
+    """Gemini APIを使用してバッチ翻訳を実行します。:fキーのICU複数形前処理を含む。"""
+    if not batch:
+        return {}
+
+    # :f サフィックスキーのICU複数形フォーマットを前処理
+    regular_batch: Dict[str, str] = {}
+    icu_parsed: Dict[str, Any] = {}         # orig_key -> parsed ICU構造
+    icu_cat_batch: Dict[str, str] = {}      # temp_key -> カテゴリテキスト
+    icu_cat_map: List[Tuple[str, str, str]] = []  # (temp_key, orig_key, cat_name)
+    icu_idx = 0
+
+    for key, value in batch.items():
+        if key.endswith(':f'):
+            parsed = parse_icu_value(value)
+            if parsed:
+                icu_parsed[key] = parsed
+                for cat, text in parsed['categories'].items():
+                    temp_key = f"_f{icu_idx}"
+                    icu_cat_batch[temp_key] = text
+                    icu_cat_map.append((temp_key, key, cat))
+                    icu_idx += 1
+                continue
+        regular_batch[key] = value
+
+    # 通常キーの翻訳
+    results = _call_gemini_api(regular_batch, glossary, ai_rules, strict_force) if regular_batch else {}
+
+    # ICUカテゴリの翻訳 → ICU文字列を再構築
+    if icu_cat_batch:
+        icu_translated = _call_gemini_api(icu_cat_batch, glossary, ai_rules, strict_force)
+
+        # カテゴリを元のキーごとに集約
+        cat_results: Dict[str, Dict[str, str]] = {}
+        for temp_key, orig_key, cat in icu_cat_map:
+            if orig_key not in cat_results:
+                cat_results[orig_key] = {}
+            if temp_key in icu_translated:
+                cat_results[orig_key][cat] = icu_translated[temp_key]
+
+        # 全カテゴリが揃ったキーのみICU文字列として再構築
+        for orig_key, translated_cats in cat_results.items():
+            parsed = icu_parsed[orig_key]
+            if len(translated_cats) == len(parsed['categories']):
+                results[orig_key] = reconstruct_icu_value(parsed, translated_cats)
+
+    return results
 
 def parse_arguments():
     """コマンドライン引数を解析します。"""
